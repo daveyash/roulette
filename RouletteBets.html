@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roulette Bet Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .roulette-wheel {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-top: 2rem;
+        }
+        /* Responsive grid columns */
+        @media (min-width: 640px) {
+            .roulette-wheel {
+                grid-template-columns: repeat(13, 1fr);
+            }
+        }
+        .roulette-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 1 / 1;
+            border-radius: 50%;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .roulette-number:hover {
+            transform: scale(1.1);
+        }
+        .roulette-number.red { background-color: #dc2626; color: white; }
+        .roulette-number.black { background-color: #111827; color: white; border: 1px solid #4a5568; }
+        .roulette-number.green { background-color: #22c55e; color: white; }
+        .roulette-number.selected {
+            border-color: #f59e0b;
+            box-shadow: 0 0 15px #f59e0b;
+        }
+        .history-item {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin: 2px;
+            font-weight: bold;
+            flex-shrink: 0; /* Prevent items from shrinking */
+        }
+        .history-item.red { background-color: #dc2626; color: white; }
+        .history-item.black { background-color: #111827; color: white; border: 1px solid #4a5568; }
+        .history-item.green { background-color: #22c55e; color: white; }
+        .history-log {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            background-color: #111827;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            overflow-y: auto;
+            align-items: center; /* Vertically center items within a line */
+            align-content: flex-start; /* Pack wrapped lines to the top */
+            height: 144px; /* Fixed height for ~3 rows */
+            width: 100%; /* Use full width of its container */
+        }
+        /* Toggle Switch */
+        .toggle-bg:after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            background: white;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 9999px;
+            transition: 0.3s;
+        }
+        input:checked + .toggle-bg:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+        input:checked + .toggle-bg {
+            background-color: #4f46e5;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Reset Button -->
+    <button id="resetButton" class="absolute top-4 left-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 z-20">Reset</button>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8 pt-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Roulette Bet Calculator</h1>
+            <h2 class="text-xl md:text-2xl font-semibold text-gray-400 mt-2">Martingale Strategy</h2>
+        </header>
+
+        <main class="flex flex-col gap-8">
+            <!-- Settings Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Settings</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center text-center">
+                    <div class="flex flex-col items-center">
+                        <label for="buyInAmount" class="text-sm font-medium text-gray-400 mb-2">Buy In ($)</label>
+                        <input type="text" id="buyInAmount" value="1000" inputmode="numeric" pattern="[0-9]*" class="w-32 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <label for="minBetAmount" class="text-sm font-medium text-gray-400 mb-2">Min Bet ($)</label>
+                        <input type="text" id="minBetAmount" value="1" inputmode="numeric" pattern="[0-9]*" class="w-32 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <label for="maxBetAmount" class="text-sm font-medium text-gray-400 mb-2">Max Bet ($)</label>
+                        <input type="text" id="maxBetAmount" value="256" inputmode="numeric" pattern="[0-9]*" class="w-32 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <label for="simplifyBets" class="text-sm font-medium text-gray-400 mb-2">Simplify Bets</label>
+                        <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="simplifyBets" id="simplifyBets" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer opacity-0"/>
+                            <label for="simplifyBets" class="toggle-bg block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistics Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Statistics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                    <div class="bg-gray-900/50 p-3 rounded-md">
+                        <span class="font-bold text-lg text-gray-300">Total</span>
+                        <span id="totalAmount" class="block font-mono text-2xl font-bold text-blue-400 mt-1">$1000</span>
+                    </div>
+                    <div class="bg-gray-900/50 p-3 rounded-md">
+                        <span class="font-bold text-lg text-gray-300">Net</span>
+                        <span id="netAmount" class="block font-mono text-2xl font-bold text-gray-400 mt-1">$0</span>
+                    </div>
+                    <div class="bg-gray-900/50 p-3 rounded-md">
+                        <span class="font-bold text-lg text-gray-300">Win</span>
+                        <span id="winAmount" class="block font-mono text-2xl font-bold text-green-400 mt-1">$0</span>
+                    </div>
+                    <div class="bg-gray-900/50 p-3 rounded-md">
+                        <span class="font-bold text-lg text-gray-300">Loss</span>
+                        <span id="lossAmount" class="block font-mono text-2xl font-bold text-red-400 mt-1">$0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Previous Bet Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4">Previous Bet</h2>
+                <div class="grid grid-cols-6 gap-4 text-center">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">1-18</label>
+                        <input type="text" id="prevBet1to18" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Even</label>
+                        <input type="text" id="prevBetEven" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Red</label>
+                        <input type="text" id="prevBetRed" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Black</label>
+                        <input type="text" id="prevBetBlack" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Odd</label>
+                        <input type="text" id="prevBetOdd" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">19-36</label>
+                        <input type="text" id="prevBet19to36" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Bet Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4">Next Bet</h2>
+                <div class="grid grid-cols-6 gap-4 text-center">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">1-18</label>
+                        <input type="text" id="nextBet1to18" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Even</label>
+                        <input type="text" id="nextBetEven" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Red</label>
+                        <input type="text" id="nextBetRed" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Black</label>
+                        <input type="text" id="nextBetBlack" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Odd</label>
+                        <input type="text" id="nextBetOdd" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">19-36</label>
+                        <input type="text" id="nextBet19to36" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simplified Bet Section -->
+            <div id="simplifiedBetSection" class="bg-gray-800 p-6 rounded-lg shadow-lg hidden">
+                <h2 class="text-2xl font-semibold mb-4">Simplified Bet</h2>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <label id="simplifiedRangeLabel" class="block text-sm font-medium text-gray-400 mb-1">Range</label>
+                        <input type="text" id="simplifiedRangeValue" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label id="simplifiedParityLabel" class="block text-sm font-medium text-gray-400 mb-1">Parity</label>
+                        <input type="text" id="simplifiedParityValue" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                    <div>
+                        <label id="simplifiedColorLabel" class="block text-sm font-medium text-gray-400 mb-1">Color</label>
+                        <input type="text" id="simplifiedColorValue" readonly class="w-full bg-gray-900 text-white text-center font-bold p-2 rounded-md">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roulette Wheel Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4 text-center">Select Winning Number</h2>
+                <div id="rouletteWheel" class="roulette-wheel"></div>
+            </div>
+            
+            <!-- History Section -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold">Spin History</h2>
+                    <span id="spinCount" class="text-lg text-gray-400 font-medium">Spins: 0</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="latestNumberDisplay"></div>
+                    <div id="history" class="history-log flex-1"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Generic Confirmation Modal -->
+    <div id="appModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm mx-auto">
+            <h3 id="modalTitle" class="text-xl font-bold text-white mb-4">Are you sure?</h3>
+            <p id="modalMessage" class="text-gray-300 mb-6">This action cannot be undone.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="modalConfirmNo" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-md transition">No</button>
+                <button id="modalConfirmYes" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md transition">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Number Confirmation Modal -->
+    <div id="numberConfirmationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm mx-auto text-center">
+            <h3 class="text-xl font-bold text-white mb-4">Confirm Winning Number</h3>
+            <div id="modalNumberContainer" class="flex justify-center my-6">
+                <!-- JS will inject the number here -->
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button id="numberConfirmNo" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-md transition">No</button>
+                <button id="numberConfirmYes" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition">Yes</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuration ---
+            const ROULETTE_NUMBERS = {
+                0: 'green', 1: 'red', 2: 'black', 3: 'red', 4: 'black', 5: 'red', 6: 'black', 7: 'red', 8: 'black', 9: 'red', 10: 'black',
+                11: 'black', 12: 'red', 13: 'black', 14: 'red', 15: 'black', 16: 'red', 17: 'black', 18: 'red', 19: 'red', 20: 'black',
+                21: 'red', 22: 'black', 23: 'red', 24: 'black', 25: 'red', 26: 'black', 27: 'red', 28: 'black', 29: 'black', 30: 'red',
+                31: 'black', 32: 'red', 33: 'black', 34: 'red', 35: 'black', 36: 'red'
+            };
+            const BET_CATEGORIES = ['1to18', 'even', 'red', 'black', 'odd', '19to36'];
+
+            // --- DOM Elements ---
+            const rouletteWheel = document.getElementById('rouletteWheel');
+            const historyContainer = document.getElementById('history');
+            const latestNumberDisplay = document.getElementById('latestNumberDisplay');
+            const spinCountElement = document.getElementById('spinCount');
+            const resetButton = document.getElementById('resetButton');
+            const appModal = document.getElementById('appModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalConfirmYes = document.getElementById('modalConfirmYes');
+            const modalConfirmNo = document.getElementById('modalConfirmNo');
+            const numberConfirmationModal = document.getElementById('numberConfirmationModal');
+            const modalNumberContainer = document.getElementById('modalNumberContainer');
+            const numberConfirmYes = document.getElementById('numberConfirmYes');
+            const numberConfirmNo = document.getElementById('numberConfirmNo');
+            const buyInAmountInput = document.getElementById('buyInAmount');
+            const minBetAmountInput = document.getElementById('minBetAmount');
+            const maxBetAmountInput = document.getElementById('maxBetAmount');
+            const simplifyBetsToggle = document.getElementById('simplifyBets');
+            const totalAmountDisplay = document.getElementById('totalAmount');
+            const netAmountDisplay = document.getElementById('netAmount');
+            const winAmountDisplay = document.getElementById('winAmount');
+            const lossAmountDisplay = document.getElementById('lossAmount');
+            const simplifiedBetSection = document.getElementById('simplifiedBetSection');
+            const simplifiedRangeLabel = document.getElementById('simplifiedRangeLabel');
+            const simplifiedRangeValue = document.getElementById('simplifiedRangeValue');
+            const simplifiedParityLabel = document.getElementById('simplifiedParityLabel');
+            const simplifiedParityValue = document.getElementById('simplifiedParityValue');
+            const simplifiedColorLabel = document.getElementById('simplifiedColorLabel');
+            const simplifiedColorValue = document.getElementById('simplifiedColorValue');
+            
+            const prevBetInputs = {
+                '1to18': document.getElementById('prevBet1to18'),
+                'even': document.getElementById('prevBetEven'),
+                'red': document.getElementById('prevBetRed'),
+                'black': document.getElementById('prevBetBlack'),
+                'odd': document.getElementById('prevBetOdd'),
+                '19to36': document.getElementById('prevBet19to36')
+            };
+
+            const nextBetInputs = {
+                '1to18': document.getElementById('nextBet1to18'),
+                'even': document.getElementById('nextBetEven'),
+                'red': document.getElementById('nextBetRed'),
+                'black': document.getElementById('nextBetBlack'),
+                'odd': document.getElementById('nextBetOdd'),
+                '19to36': document.getElementById('nextBet19to36')
+            };
+
+            // --- Game State ---
+            let gameState = {};
+            let onConfirmCallback = null;
+            let pendingWinningNumber = null;
+
+            // --- Modal Logic ---
+            function showModal(title, message, onConfirm) {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                onConfirmCallback = onConfirm;
+                appModal.classList.remove('hidden');
+            }
+
+            function hideModal() {
+                appModal.classList.add('hidden');
+                onConfirmCallback = null;
+            }
+
+            // --- Initialization ---
+            function initialize() {
+                loadState();
+                createWheel();
+                updateUI();
+                
+                // Event Listeners
+                rouletteWheel.addEventListener('click', handleNumberClick);
+                resetButton.addEventListener('click', () => {
+                    showModal(
+                        'Reset Game?',
+                        'This will reset all settings and clear history, wins, and losses. This action cannot be undone.',
+                        resetGame
+                    );
+                });
+                
+                modalConfirmNo.addEventListener('click', hideModal);
+                modalConfirmYes.addEventListener('click', () => {
+                    if (typeof onConfirmCallback === 'function') {
+                        onConfirmCallback();
+                    }
+                    hideModal();
+                });
+
+                numberConfirmNo.addEventListener('click', () => {
+                    numberConfirmationModal.classList.add('hidden');
+                    pendingWinningNumber = null;
+                });
+                numberConfirmYes.addEventListener('click', processConfirmedNumber);
+
+                // Settings change listeners
+                buyInAmountInput.addEventListener('change', (e) => handleSettingChange(e, 'buyIn', 'Buy In'));
+                minBetAmountInput.addEventListener('change', (e) => handleSettingChange(e, 'minBet', 'Min Bet'));
+                maxBetAmountInput.addEventListener('change', (e) => handleSettingChange(e, 'maxBet', 'Max Bet'));
+                simplifyBetsToggle.addEventListener('change', handleSimplifyBetsChange);
+            }
+            
+            function handleSettingChange(e, key, name) {
+                const newValue = parseInt(e.target.value, 10);
+                const oldValue = gameState[key];
+
+                if (newValue === oldValue || isNaN(newValue) || newValue < 0) {
+                    e.target.value = oldValue;
+                    return;
+                }
+
+                e.target.value = oldValue; // Revert UI temporarily
+
+                showModal(
+                    `Change ${name}?`,
+                    `Changing the ${name} will reset your current game progress (history, wins, and losses). Are you sure?`,
+                    () => {
+                        gameState[key] = newValue;
+                        resetGameProgress();
+                        updateUI();
+                    }
+                );
+            }
+
+            function handleSimplifyBetsChange(e) {
+                const newValue = e.target.checked;
+                const oldValue = gameState.simplifyBets;
+                
+                e.target.checked = oldValue; // Revert UI temporarily
+
+                showModal(
+                    'Change Setting?',
+                    'Are you sure you want to change the Simplify Bets option?',
+                    () => {
+                        gameState.simplifyBets = newValue;
+                        updateUI();
+                    }
+                );
+            }
+
+            function createWheel() {
+                rouletteWheel.innerHTML = '';
+                Object.entries(ROULETTE_NUMBERS).forEach(([number, color]) => {
+                    const numberEl = document.createElement('div');
+                    numberEl.textContent = number;
+                    numberEl.classList.add('roulette-number', color);
+                    numberEl.dataset.number = number;
+                    rouletteWheel.appendChild(numberEl);
+                });
+            }
+            
+            function checkWin(number, betType) {
+                if (number === 0) return false; // 0 is always a loss for even money bets
+
+                const isRed = ROULETTE_NUMBERS[number] === 'red';
+                const isEven = number % 2 === 0;
+                const isLow = number >= 1 && number <= 18;
+
+                switch (betType) {
+                    case 'red': return isRed;
+                    case 'black': return !isRed;
+                    case 'even': return isEven;
+                    case 'odd': return !isEven;
+                    case '1to18': return isLow;
+                    case '19to36': return !isLow;
+                    default: return false;
+                }
+            }
+
+
+            // --- UI Updates ---
+            function updateUI() {
+                updateHistory();
+                updateStatistics();
+                updateBetDisplays();
+                updateSimplifiedBets();
+                saveState();
+            }
+
+            function updateHistory() {
+                historyContainer.innerHTML = '';
+                latestNumberDisplay.innerHTML = '';
+                spinCountElement.textContent = `Spins: ${gameState.history.length}`;
+
+                if (gameState.history.length === 0) {
+                    historyContainer.innerHTML = '<p class="text-gray-400 p-2">Older spins will appear here.</p>';
+                    latestNumberDisplay.innerHTML = `<div class="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-3xl font-bold">?</div>`;
+                    return;
+                }
+
+                const latestNumber = gameState.history[gameState.history.length - 1];
+                const latestEl = document.createElement('div');
+                latestEl.textContent = latestNumber;
+                const latestColor = ROULETTE_NUMBERS[latestNumber];
+                latestEl.className = `w-16 h-16 rounded-full flex items-center justify-center text-3xl font-bold text-white history-item ${latestColor}`;
+                latestNumberDisplay.appendChild(latestEl);
+
+                const olderHistory = [...gameState.history].reverse().slice(1);
+                if (olderHistory.length > 0) {
+                    olderHistory.forEach(number => {
+                        const historyEl = document.createElement('div');
+                        historyEl.textContent = number;
+                        const color = ROULETTE_NUMBERS[number];
+                        historyEl.classList.add('history-item', color);
+                        historyContainer.appendChild(historyEl);
+                    });
+                } else {
+                    historyContainer.innerHTML = '<p class="text-gray-400 p-2">Older spins will appear here.</p>';
+                }
+            }
+
+            function updateStatistics() {
+                const total = gameState.buyIn + gameState.win - gameState.loss;
+                const net = gameState.win - gameState.loss;
+
+                totalAmountDisplay.textContent = `$${Math.floor(total)}`;
+                winAmountDisplay.textContent = `$${Math.floor(gameState.win)}`;
+                lossAmountDisplay.textContent = `$${Math.floor(gameState.loss)}`;
+                netAmountDisplay.textContent = `$${Math.floor(net)}`;
+
+                // Update Net Amount Color
+                if (net > 0) {
+                    netAmountDisplay.classList.remove('text-red-400', 'text-gray-400');
+                    netAmountDisplay.classList.add('text-green-400');
+                } else if (net < 0) {
+                    netAmountDisplay.classList.remove('text-green-400', 'text-gray-400');
+                    netAmountDisplay.classList.add('text-red-400');
+                } else {
+                    netAmountDisplay.classList.remove('text-green-400', 'text-red-400');
+                    netAmountDisplay.classList.add('text-gray-400');
+                }
+                
+                // Update input fields to match state
+                buyInAmountInput.value = gameState.buyIn;
+                minBetAmountInput.value = gameState.minBet;
+                maxBetAmountInput.value = gameState.maxBet;
+                simplifyBetsToggle.checked = gameState.simplifyBets;
+            }
+
+            function updateBetDisplays() {
+                const formatCurrency = (amount) => `$${Math.floor(amount)}`;
+                for (const key of BET_CATEGORIES) {
+                    nextBetInputs[key].value = formatCurrency(gameState.nextBets[key]);
+                    prevBetInputs[key].value = gameState.previousBets[key] ? formatCurrency(gameState.previousBets[key]) : '';
+                }
+            }
+
+            function updateSimplifiedBets() {
+                if (gameState.simplifyBets) {
+                    simplifiedBetSection.classList.remove('hidden');
+                    const formatCurrency = (amount) => `$${Math.floor(amount)}`;
+
+                    // Range
+                    const lowBet = gameState.nextBets['1to18'];
+                    const highBet = gameState.nextBets['19to36'];
+                    if (lowBet >= highBet) {
+                        simplifiedRangeLabel.textContent = '1-18';
+                        simplifiedRangeValue.value = formatCurrency(lowBet - highBet);
+                    } else {
+                        simplifiedRangeLabel.textContent = '19-36';
+                        simplifiedRangeValue.value = formatCurrency(highBet - lowBet);
+                    }
+
+                    // Parity
+                    const evenBet = gameState.nextBets.even;
+                    const oddBet = gameState.nextBets.odd;
+                    if (evenBet >= oddBet) {
+                        simplifiedParityLabel.textContent = 'Even';
+                        simplifiedParityValue.value = formatCurrency(evenBet - oddBet);
+                    } else {
+                        simplifiedParityLabel.textContent = 'Odd';
+                        simplifiedParityValue.value = formatCurrency(oddBet - evenBet);
+                    }
+
+                    // Color
+                    const redBet = gameState.nextBets.red;
+                    const blackBet = gameState.nextBets.black;
+                    if (redBet >= blackBet) {
+                        simplifiedColorLabel.textContent = 'Red';
+                        simplifiedColorValue.value = formatCurrency(redBet - blackBet);
+                    } else {
+                        simplifiedColorLabel.textContent = 'Black';
+                        simplifiedColorValue.value = formatCurrency(blackBet - redBet);
+                    }
+
+                } else {
+                    simplifiedBetSection.classList.add('hidden');
+                }
+            }
+
+            // --- Event Handlers ---
+            function handleNumberClick(e) {
+                const target = e.target.closest('.roulette-number');
+                if (!target) return;
+
+                pendingWinningNumber = parseInt(target.dataset.number);
+                
+                // Create the styled number display for the modal
+                modalNumberContainer.innerHTML = '';
+                const numberEl = document.createElement('div');
+                numberEl.textContent = pendingWinningNumber;
+                const color = ROULETTE_NUMBERS[pendingWinningNumber];
+                // Larger size for the modal display
+                numberEl.className = `roulette-number ${color} w-20 h-20 text-3xl`;
+                modalNumberContainer.appendChild(numberEl);
+
+                numberConfirmationModal.classList.remove('hidden');
+            }
+
+            function processConfirmedNumber() {
+                if (pendingWinningNumber === null) return;
+                const winningNumber = pendingWinningNumber;
+                pendingWinningNumber = null; // Clear pending number
+                numberConfirmationModal.classList.add('hidden');
+
+                // 1. Move current 'nextBets' to 'previousBets'
+                gameState.previousBets = { ...gameState.nextBets };
+
+                // 2. Calculate new 'nextBets' and update win/loss
+                const newNextBets = {};
+                for (const category of BET_CATEGORIES) {
+                    const betAmount = gameState.previousBets[category];
+                    if (checkWin(winningNumber, category)) {
+                        // Win
+                        gameState.win += betAmount;
+                        newNextBets[category] = gameState.minBet;
+                    } else {
+                        // Loss
+                        gameState.loss += betAmount;
+                        let doubledBet = betAmount * 2;
+                        // Check against max bet
+                        if (doubledBet > gameState.maxBet) {
+                            newNextBets[category] = gameState.minBet;
+                        } else {
+                            newNextBets[category] = doubledBet;
+                        }
+                    }
+                }
+                gameState.nextBets = newNextBets;
+
+                // 3. Add to history
+                gameState.history.push(winningNumber);
+                if(gameState.history.length > 300) gameState.history.shift();
+
+                // 4. Update the entire UI
+                updateUI();
+                
+                // 5. Visual feedback on the main wheel
+                const wheelNumberEl = rouletteWheel.querySelector(`[data-number="${winningNumber}"]`);
+                if(wheelNumberEl) {
+                    wheelNumberEl.classList.add('selected');
+                    setTimeout(() => wheelNumberEl.classList.remove('selected'), 1000);
+                }
+            }
+            
+            function getInitialState() {
+                const initialState = {
+                    history: [],
+                    buyIn: 1000,
+                    minBet: 1,
+                    maxBet: 256,
+                    simplifyBets: true,
+                    win: 0,
+                    loss: 0,
+                    previousBets: {},
+                    nextBets: {}
+                };
+                for (const key of BET_CATEGORIES) {
+                    initialState.nextBets[key] = initialState.minBet;
+                    initialState.previousBets[key] = null;
+                }
+                return initialState;
+            }
+
+            function resetGame() {
+                gameState = getInitialState();
+                updateUI();
+            }
+            
+            function resetGameProgress() {
+                gameState.history = [];
+                gameState.win = 0;
+                gameState.loss = 0;
+                gameState.previousBets = {};
+                for (const key of BET_CATEGORIES) {
+                    gameState.nextBets[key] = gameState.minBet;
+                    gameState.previousBets[key] = null;
+                }
+                updateUI();
+            }
+
+            // --- Persistence ---
+            function saveState() {
+                localStorage.setItem('rouletteGameState', JSON.stringify(gameState));
+            }
+
+            function loadState() {
+                const savedState = localStorage.getItem('rouletteGameState');
+                if (savedState) {
+                    const loaded = JSON.parse(savedState);
+                    gameState = { ...getInitialState(), ...loaded };
+                } else {
+                    resetGame();
+                }
+            }
+            
+            initialize();
+        });
+    </script>
+
+</body>
+</html>
